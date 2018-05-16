@@ -113,7 +113,7 @@ BOOL CARPLayer::Send(unsigned char *ppayload, int nlength)
 		 //PostMessage를 써야할지 고민....
 		 //없으면 FF-FF-FF...으로 다보냄...
 		//이더넷 주소를 브로드캐스트로 보냄.
-         return GetUnderLayer()->Send((unsigned char*)&m_sHeader , sizeof(m_sHeader) , 0x01);//여기서 저장된 정보를 하위 레이어로 보냄
+         return mp_UnderLayer->Send((unsigned char*)&m_sHeader , sizeof(m_sHeader) , 0x01);//여기서 저장된 정보를 하위 레이어로 보냄
 		 //ARP Request 전송
 		//그 index를 가지고 전송.
 	}
@@ -128,7 +128,37 @@ BOOL CARPLayer::Send(unsigned char *ppayload, int nlength)
 // 받기
 BOOL CARPLayer::Receive( unsigned char* ppayload )
 {
-	return TRUE ;
+	
+	LPARPLayer_HEADER pFrame =(LPARPLayer_HEADER)ppayload;
+	if(ntohs(pFrame->op) == 0x0001 && memcmp(pFrame->targetIP , m_sHeader.senderIP ,  4 ) == 0){ //request일때
+		// 물어보는 것이 내꺼면
+		m_sHeader.hardType = htons(0x0001);
+		m_sHeader.protType = htons(0x0800);
+		m_sHeader.hardSize = 6;
+		m_sHeader.protSize = 4;
+		m_sHeader.op = htons(0x0002); //reply code
+
+		//sender Mac주소와 IP주소를 target Mac주소와 IP주소로
+		//target Mac주소와 IP주소를 sender Mac주소와 IP주소로
+		memcpy( m_sHeader.senderMac , pFrame->targetMac, 6); 
+		memcpy( m_sHeader.senderIP , pFrame->targetIP, 4);
+		memcpy( m_sHeader.targetIP , pFrame->senderIP, 4);
+		memcpy( m_sHeader.targetMac , pFrame->senderMac, 6);
+		return mp_UnderLayer->Send((unsigned char*)&m_sHeader , sizeof(m_sHeader) , 0x02);
+	}
+	else if(ntohs(pFrame->op) == 0x0001 && memcmp(pFrame->targetIP , m_sHeader.senderIP ,  4 ) != 0){
+		//request 이지만 내꺼가 아닐때......
+		//버린다??????????
+		return FALSE;
+
+	}
+	else if(ntohs(pFrame->op) == 0x0002 && memcmp(pFrame->targetIP, m_sHeader.senderIP, 4 ) == 0){ //reply일때
+		//reply인데 내꺼일때.
+		//ARP 테이블에 저장을 해야하는데 어떻게 해야할까요.......
+		//새로운 함수를 만들까요 아니면
+		//cache_table.
+	}
+	return FALSE; //op가 1,2가 아닐때.
 }
 
 int CARPLayer::SearchCacheTable(){
