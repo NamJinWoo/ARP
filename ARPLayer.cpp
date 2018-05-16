@@ -12,6 +12,7 @@ static char THIS_FILE[]=__FILE__;
 #define new DEBUG_NEW
 #endif
 
+#define UM_ARPTABLEUPDATE WM_USER+2
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
@@ -94,12 +95,8 @@ BOOL CARPLayer::Send(unsigned char *ppayload, int nlength)
 			cache_table.GetAt(cache_table.FindIndex(ARPindex)).macAddress[3],
 			cache_table.GetAt(cache_table.FindIndex(ARPindex)).macAddress[4],
 			cache_table.GetAt(cache_table.FindIndex(ARPindex)).macAddress[5]);
-		cache_table.
-		return mp_UnderLayer -> Receive();
-
-		
-		//없으면 FF-FF-FF...으로 다보냄...
-		//이더넷 주소를 브로드캐스트로 보냄.
+		//SendMessage(AfxGetApp()->m_pMainWnd, nRegArpSendMsg, 0, 0 );
+		AfxGetApp()->m_pMainWnd->SendMessageA( UM_ARPTABLEUPDATE, ARPindex, (LPARAM)LPSTR(LPCTSTR(alreadyExist)));
 	}
 	else{
 		//없으면 헤더에 있는 값들 설정해줌...
@@ -114,7 +111,8 @@ BOOL CARPLayer::Send(unsigned char *ppayload, int nlength)
 		//ARP 헤더에 sender호스트의 맥주소 설정
          SendMessage(HWND_BROADCAST , nRegArpSendMsg ,0 , 0);//하위 레이어에 arpmessage를 broadcast로 보냄 
 		 //PostMessage를 써야할지 고민....
-
+		 //없으면 FF-FF-FF...으로 다보냄...
+		//이더넷 주소를 브로드캐스트로 보냄.
          return GetUnderLayer()->Send((unsigned char*)&m_sHeader , sizeof(m_sHeader) , 0x01);//여기서 저장된 정보를 하위 레이어로 보냄
 		 //ARP Request 전송
 		//그 index를 가지고 전송.
