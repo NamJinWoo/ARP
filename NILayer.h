@@ -35,10 +35,7 @@ public:
 	pcap_if_t*		GetAdapter(int index);
 
 	void			SetThreadState( BOOL state ) ;
-
 	static UINT		ReadingThread(LPVOID lpParam);
-
-
 	BOOL			Receive(unsigned char* m_ppayload); // 파일에서 읽어서 상위 계층으로 내용 전달;
 	BOOL			Send( unsigned char* ppayload, int nlength );
 
@@ -47,7 +44,6 @@ public:
 
 private:
 	void SetAdapterList();
-
 };
 
 #endif // !defined(AFX_NILAYER_H__D67222B3_1B00_4C77_84A4_CEF6D572E181__INCLUDED_)

@@ -5,6 +5,7 @@
 #include "ARPAppDlg.h"
 
 #define UM_UPDATEDATA WM_USER+1
+#define UM_ARPTABLEUPDATE WM_USER+2
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -82,24 +83,24 @@ CARPAppDlg::CARPAppDlg(CWnd* pParent /*=NULL*/)
 	m_LayerMgr.AddLayer( this ) ; //  ChatDlg
 
 	// -------------------------- 계층 연결 -------------------------- //
-	//m_LayerMgr.ConnectLayers(""); // 계층 순서대로 연결
-/*
+	m_LayerMgr.ConnectLayers("NI ( *Ethernet ( +IP ( -ARP *ARPDlg ) *ARP ) ) )"); // 계층 순서대로 연결
+
 	m_ARP = (CARPLayer*) m_LayerMgr.GetLayer( "ARP" ) ;
 	m_IP = (CIPLayer*) m_LayerMgr.GetLayer( "IP" ) ;
 	m_ETH = (CEthernetLayer*) m_LayerMgr.GetLayer( "Ethernet" ) ;
 	m_NI = (CNILayer*) m_LayerMgr.GetLayer( "NI" ) ;
-	*/
-}
+}	
 
 void CARPAppDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
 	//{{AFX_DATA_MAP(CARPAppDlg)
-	DDX_Control(pDX, IDC_LIST_CHAT, m_ListChat);
+	DDX_Control(pDX, IDC_LIST_ARP, m_ListARP);
 	
+	DDX_Control(pDX, IDC_SRCIP, m_unSrcIPAddr);
 	DDX_Text(pDX, IDC_EDIT_DSTMAC, m_unDstEthAddr);
 	DDX_Control(pDX, IDC_EDIT_DSTIP, m_unDstIPAddr);
-
+	DDX_Control(pDX, IDC_COMBO_NIC, m_ComboNIC);
 	//}}AFX_DATA_MAP
 }
 
@@ -113,12 +114,15 @@ BEGIN_MESSAGE_MAP(CARPAppDlg, CDialog)
 
 	ON_MESSAGE(UM_UPDATEDATA,OnUpdateDataFalse)
 	
+	ON_MESSAGE(UM_ARPTABLEUPDATE, OnARPTableUpdate)
+
 	ON_BN_CLICKED(IDC_BUTTON_ITEMDELETE, &CARPAppDlg::OnBnClickedButtonItemdelete)
 	ON_BN_CLICKED(IDC_BUTTON_ALLDELETE, &CARPAppDlg::OnBnClickedButtonAlldelete)
 	ON_BN_CLICKED(IDC_BUTTON_SENDARP, &CARPAppDlg::OnBnClickedButtonSendarp)
 	ON_BN_CLICKED(IDC_BUTTON_SENDGRATUITOUSARP, &CARPAppDlg::OnBnClickedButtonSendgratuitousarp)
 	ON_BN_CLICKED(IDC_BUTTON_CANCLE, &CARPAppDlg::OnBnClickedButtonCancle)
 	ON_BN_CLICKED(IDC_BUTTON_EXIT, &CARPAppDlg::OnBnClickedButtonExit)
+	ON_BN_CLICKED(IDC_BUTTON_SET, &CARPAppDlg::OnBnClickedButtonSet)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -156,12 +160,94 @@ BOOL CARPAppDlg::OnInitDialog()
 	
 	// TODO: Add extra initialization here
 
-	//SetDlgState( arp_INITIALIZING ) ; // 기본 설정 셋팅
-	//SetDlgState( CFT_COMBO_SET ) ; // 랜카드 내용 가져오기
+	SetDlgState( arp_INITIALIZING ) ; // 기본 통신 준비
+	SetDlgState( CFT_COMBO_SET );
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
+// 수정 필요
+void CARPAppDlg::SetDlgState(int state)
+{
+	
+	CButton*	pSendARPButton = (CButton*) GetDlgItem( IDC_BUTTON_SENDARP ) ;
+	CButton*	pSendGARPButton = (CButton*) GetDlgItem( IDC_BUTTON_SENDGRATUITOUSARP ) ;
+	CButton*	pAllDeleteButton = (CButton*) GetDlgItem( IDC_BUTTON_ALLDELETE ) ;
+	CButton*	pItemDeleteButton = (CButton*) GetDlgItem( IDC_BUTTON_ITEMDELETE ) ;
+	CButton*	pSetButton = (CButton*) GetDlgItem( IDC_BUTTON_SET ) ;
+	
+	CEdit*		pDstEdit = (CEdit*) GetDlgItem( IDC_EDIT_DSTMAC ) ;
+
+	CComboBox*	pNICCombo = (CComboBox*) GetDlgItem( IDC_COMBO_NIC ) ;
+
+	UpdateData( TRUE ) ;
+
+	switch( state ){
+	case arp_INITIALIZING: 
+		// 기본 화면 세팅, arp 테이블 지우는 거 필요
+		m_ListARP.ResetContent();
+		m_ListARP.EnableWindow( FALSE );
+		pSendARPButton->EnableWindow( FALSE );
+		pSendGARPButton->EnableWindow( FALSE );
+		m_unDstIPAddr.EnableWindow( FALSE );
+		pDstEdit->EnableWindow( FALSE );
+		pAllDeleteButton->EnableWindow( FALSE );
+		pItemDeleteButton->EnableWindow( FALSE );
+		break;
+	case arp_ADDR_SET:
+		// 설정 버튼 누름
+		m_NI->SetThreadState( TRUE ) ;
+
+		SetAddresses();
+		SetTimer(2018, 1000, NULL ) ;
+
+		m_ListARP.EnableWindow( TRUE );
+		pSendARPButton->EnableWindow( TRUE );
+		pSendGARPButton->EnableWindow( TRUE );
+		m_unDstIPAddr.EnableWindow( TRUE );
+		pDstEdit->EnableWindow( TRUE );
+		pAllDeleteButton->EnableWindow( TRUE );
+		pItemDeleteButton->EnableWindow( TRUE );
+		m_ComboNIC.EnableWindow( FALSE );
+		m_unSrcIPAddr.EnableWindow( FALSE );
+		pSetButton->SetWindowText( "재설정" ) ; 
+		break;
+	case arp_ADDR_RESET:
+		// 재설정 버튼 누름
+		m_NI->SetThreadState( FALSE ) ;
+
+		KillTimer(2018) ;
+
+		m_ListARP.EnableWindow( FALSE );
+		pSendARPButton->EnableWindow( FALSE );
+		pSendGARPButton->EnableWindow( FALSE );
+		m_unDstIPAddr.EnableWindow( FALSE );
+		pDstEdit->EnableWindow( FALSE );
+		pAllDeleteButton->EnableWindow( FALSE );
+		pItemDeleteButton->EnableWindow( FALSE );
+		m_ComboNIC.EnableWindow( TRUE );
+		m_unSrcIPAddr.EnableWindow( TRUE );
+		pSetButton->SetWindowText( "설정" ) ; 
+		break;
+	case CFT_COMBO_SET: // 왜 안되지 ?
+		CString NIC_description;
+
+		for(int i = 0 ; i< NI_COUNT_NIC ; i ++ )
+		{
+			if( !m_NI->GetAdapter( i ) )
+				break;
+			NIC_description = m_NI->GetAdapter( i )->description ;
+			NIC_description.Trim();
+			
+			m_ComboNIC.AddString( NIC_description ) ;
+			
+		}
+		m_ComboNIC.SetCurSel( 0 ) ;
+		break;
+	}
+	UpdateData( FALSE ) ;
+
+}
 void CARPAppDlg::OnSysCommand(UINT nID, LPARAM lParam)
 {
 	if ( nID == SC_CLOSE )
@@ -220,47 +306,84 @@ HCURSOR CARPAppDlg::OnQueryDragIcon()
 	return (HCURSOR) m_hIcon;
 }
 
-// 수정 필요
-void CARPAppDlg::SendData()
+void CARPAppDlg::SetAddresses() // 입력된 주소로 IP 헤더 설정
 {
-	CString MsgHeader ; 
+	// 맥주소, IP 주소 설정
+	BYTE src_ip[4];
 
-	//------------- 채팅내용 표시를 위해서 아이피주소 저장 -------------//
-	unsigned char src_ip[4]; // src IP 출력을 위한 변수
-	unsigned char dst_ip[4]; // src IP 출력을 위한 변수
-	char srcIP[30];
-	char dstIP[30];
-
-	m_unDstIPAddr.GetAddress(dst_ip[0],dst_ip[1],dst_ip[2],dst_ip[3]); // 도착 어드레스 (ip)
-	m_unSrcIPAddr.GetAddress(src_ip[0],src_ip[1],src_ip[2],src_ip[3]);
-
-	::wsprintfA(srcIP, "%d.%d.%d.%d",src_ip[0],src_ip[1],src_ip[2],src_ip[3]);
-	::wsprintfA(dstIP, "%d.%d.%d.%d",dst_ip[0],dst_ip[1],dst_ip[2],dst_ip[3]);
-	//------------- IP 주소 문자열로 저장 완료 -------------//
-
-	MsgHeader.Format( "[%s:%s] ", srcIP, dstIP ) ;
-
-	m_ListChat.AddString( MsgHeader + m_stMessage ) ; // 채팅창에 메세지출력
+	// 입력된 값으로 주소 설정
+	int index = m_ComboNIC.GetCurSel() ;
 	
-	int nlength =  m_stMessage.GetLength();
-	unsigned char *ppayload = new BYTE[nlength+1]; // '\0'을 위해서 1개 더큰 배열 생성
-	memset( ppayload, 0, nlength+1);
-	memcpy(ppayload,(unsigned char*)(LPCTSTR)m_stMessage,nlength); // 메모리 복사로 내용 복사 
-	ppayload[nlength] = '\0'; //마지막 위치 널값 설정
-	// 전송!
+	PPACKET_OID_DATA OidData = (PPACKET_OID_DATA)malloc(sizeof(PACKET_OID_DATA));
+	OidData->Oid = 0x01010101;
+	OidData->Length = 6;
 
-	if(!m_ARP->Send((unsigned char*)(LPCTSTR)m_stMessage, nlength))
-		AfxMessageBox("전송 오류!");
+	LPADAPTER adapter = PacketOpenAdapter( m_NI->GetAdapter( index )->name ) ;
+	PacketRequest( adapter, FALSE, OidData ) ;
+
+	m_ETH->SetSourceAddress(OidData->Data);
+
+	m_unSrcIPAddr.GetAddress(src_ip[0],src_ip[1],src_ip[2],src_ip[3]); // 출발 어드레스 (ip)
 	
-	delete ppayload; // 동적할당 해제
+	// arp 헤더 주소 설정
+	m_ARP->setSrcIPAddress( src_ip );
+	m_ARP->setSrcMacAddress( OidData->Data );
+
+	m_ARP->setMyIPAddress( src_ip );
+	m_ARP->setMyMacAddress( OidData->Data );
+
+	
+	m_IP->SetSourceAddress(src_ip);
 }
 
-// 수정 필요
+// 수정 필요 // 아이피 아래로 보내기
+void CARPAppDlg::SendARP()
+{
+	unsigned char dst_ip[4]; // arp 대상
+	unsigned char temp = 'a';
+
+	m_unDstIPAddr.GetAddress(dst_ip[0],dst_ip[1],dst_ip[2],dst_ip[3]); // 도착 어드레스 (ip)
+	
+	m_IP->SetDestinAddress( dst_ip );
+	// arp, 주소 설정
+	m_ARP->setDstIPAddress( dst_ip );
+
+	BOOL bSuc = m_IP->Send(&temp,1);
+
+	// 전송!
+	if( !bSuc )
+		AfxMessageBox(" 전송 오류 ");
+}
+
+void CARPAppDlg::SendGARP()
+{
+	unsigned char dst_ip[4]; // arp 대상
+	unsigned char dst_mac[6]; // arp 대상
+	unsigned char temp = 'a';
+
+	// GARP - targetIP = 본인, targetMAC = ~~, sendIP = 본인, sendMAC = 입력 값
+	m_unDstIPAddr.GetAddress(dst_ip[0],dst_ip[1],dst_ip[2],dst_ip[3]); // 도착 어드레스 (ip)
+	sscanf(m_unDstEthAddr, "%02x%02x%02x%02x%02x%02x", &dst_mac[0], &dst_mac[1], &dst_mac[2], &dst_mac[3], &dst_mac[4], &dst_mac[5]);
+	
+	// arp, 주소 설정
+
+	m_ARP->setSrcIPAddress( dst_ip );
+	m_ARP->setDstIPAddress( dst_ip );
+	m_ARP->setSrcMacAddress( dst_mac );
+
+	BOOL bSuc = m_IP->Send(&temp,1);
+
+	// 전송!
+	if( !bSuc )
+		AfxMessageBox(" 전송 오류 ");
+}
+
+// ARP 정보 수신하여, listbox 업데이트, 아마 안 쓸듯
 BOOL CARPAppDlg::Receive(unsigned char *ppayload)
 {
 	CString Message; // 출력될 내용
-	Message.Format( "[%s:%s] %s", m_IP->GetSrcAddressOfRecv(), m_IP->GetDstAddressOfRecv(), (char *)ppayload ) ;
-	m_ListChat.AddString( Message ) ; // 채팅창에 메세지출력
+	Message.Format( "%s", (char *)ppayload ) ;
+	m_ListARP.AddString( Message ) ; // 채팅창에 메세지출력
 	
 	// 메인아닌 스레드에서 GUI 환경 접근 시 발생할 오류를 방지하기 위해 message를 이용하여 메인 스레드에서 처리 //
 	AfxGetApp()->m_pMainWnd->PostMessageA(UM_UPDATEDATA);
@@ -275,6 +398,23 @@ LRESULT CARPAppDlg::OnUpdateDataFalse(WPARAM wParam, LPARAM lParam)
       return 0;
 }
 
+LRESULT CARPAppDlg::OnARPTableUpdate(WPARAM wParam, LPARAM lParam)
+{
+	int table_count = m_ARP->getTableCount();
+		int i = 0;
+
+		m_ListARP.ResetContent();
+
+		while ( i < table_count ){
+			CString i_info = m_ARP->checkTableState(i);
+
+			m_ListARP.AddString( i_info );
+		}
+
+	AfxGetApp()->m_pMainWnd->PostMessageA(UM_UPDATEDATA);
+    
+	return 0;
+}
 
 BOOL CARPAppDlg::PreTranslateMessage(MSG* pMsg) 
 {
@@ -298,42 +438,73 @@ BOOL CARPAppDlg::PreTranslateMessage(MSG* pMsg)
 	
 	return CDialog::PreTranslateMessage(pMsg);
 }
-// 수정 필요
-void CARPAppDlg::SetDlgState(int state)
-{
-	UpdateData( TRUE ) ;
-
-	CButton*	pSendARPButton = (CButton*) GetDlgItem( IDC_BUTTON_SENDARP ) ;
-	CButton*	pSendGARPButton = (CButton*) GetDlgItem( IDC_BUTTON_SENDGRATUITOUSARP ) ;
-	
-	CEdit*		pDstEdit = (CEdit*) GetDlgItem( IDC_EDIT_DSTMAC ) ;
-	CEdit*		pDstIPEdit = (CEdit*) GetDlgItem( IDC_EDIT_DSTIP ) ;
-
-	switch( state ){}
-
-}
 
 void CARPAppDlg::EndofProcess()
 {
 	m_LayerMgr.DeAllocLayer( ) ;
 }
 
-// 수정 필요
+// 수정 필요 // 1초마다 arp table 확인 
 void CARPAppDlg::OnTimer(UINT nIDEvent) 
 {
 	CDialog::OnTimer(nIDEvent);
+
+	// ARP TABLE CHECK TIMER 인 경우
+	if( nIDEvent == 2018 ){
+		// 테이블 내의 접근
+		int table_count = m_ARP->getTableCount();
+		int i = 0;
+
+		m_ListARP.ResetContent();
+
+		while ( i < table_count ){
+			CString i_info = m_ARP->checkTableState(i);
+
+			m_ListARP.AddString( i_info );
+		}
+	}
+}
+
+void CARPAppDlg::OnBnClickedButtonSet(){
+	UpdateData( TRUE ) ;
+
+	if ( m_bSendReady ){
+		SetDlgState( arp_ADDR_RESET ) ;
+		SetDlgState( arp_INITIALIZING ) ;
+	}
+	else{
+		// NI_수신 시작
+		int index = m_ComboNIC.GetCurSel() ; // 현재 선택한 랜카드 인덱스가져오기
+
+		m_NI->SetAdapterNum( index ); // 가져온 인덱스로 통신 준비
+		m_NI->OpenSocket() ; // 통신 가능 설정
+
+		SetDlgState( arp_ADDR_SET ) ;
+	}
+
+	m_bSendReady = !m_bSendReady ; // 이전 상태와 반대로 바꿈
 }
 
 // 수정 필요 // ItemDelete 버튼 클릭시
 void CARPAppDlg::OnBnClickedButtonItemdelete()
 {
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	int nSel = m_ListARP.GetCurSel();
+
+	if( nSel >= 0 ){
+		m_ListARP.DeleteString( nSel );
+		// arp table 삭제
+		m_ARP->itemDelete( nSel );
+	}
 }
 
 // 수정 필요 // AllDelete 버튼 클릭시
 void CARPAppDlg::OnBnClickedButtonAlldelete()
 {
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	m_ListARP.ResetContent();
+	// arptable 초기화
+	m_ARP->allDelete();
 }
 
 // 수정 필요 // arp send 버튼 클릭시
@@ -344,9 +515,7 @@ void CARPAppDlg::OnBnClickedButtonSendarp()
 
 	if ( !m_unDstIPAddr.IsBlank() )
 	{
-		SetTimer(2018, 5000, NULL ) ;
-
-		SendData( ) ; // ARP 패킷 전송
+		SendARP() ; // ARP 패킷 전송
 		m_unDstIPAddr.ClearAddress();
 		(CEdit*) GetDlgItem( IDC_EDIT_DSTIP )->SetFocus( ) ;
 	}
@@ -362,9 +531,9 @@ void CARPAppDlg::OnBnClickedButtonSendgratuitousarp()
 
 	if ( !m_unDstEthAddr.IsEmpty() )
 	{
-		SetTimer(2018, 5000, NULL ) ;
 
-		SendData( ) ; // G-ARP 패킷 전송
+		SendGARP( ) ; // G-ARP 패킷 전송
+		
 		m_unDstEthAddr = "";
 		(CEdit*) GetDlgItem( IDC_EDIT_DSTMAC )->SetFocus( ) ;
 	}
@@ -372,7 +541,7 @@ void CARPAppDlg::OnBnClickedButtonSendgratuitousarp()
 	UpdateData( FALSE ) ;
 }
 
-// 수정 필요 // 취소 버튼 클릭시
+// 수정 필요 // 취소 버튼 클릭시 // 없어도 될듯
 void CARPAppDlg::OnBnClickedButtonCancle()
 {
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.

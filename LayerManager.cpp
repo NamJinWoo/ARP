@@ -173,7 +173,7 @@ void CLayerManager::LinkLayer(PNODE pNode)
 
 		pNode = pNode->next ;
 	}
-}
+}	
 
 void CLayerManager::DeAllocLayer()
 {

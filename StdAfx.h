@@ -38,7 +38,11 @@
 													 ETHER_HEADER_SIZE ) )
 
 // NIC count
-#define	NI_COUNT_NIC	10
+#define	NI_COUNT_NIC		10
+#define TIMEOFCOMPLETE		10
+#define TIMEOFIMCOMPLETE	0
+#define TIMEOFDELETE		-5
+
 // Microsoft Visual C++ will insert additional declarations immediately before the previous line.
 
 #endif // !defined(AFX_STDAFX_H__119ECB1B_6E70_4662_A2A9_A20B5201CA81__INCLUDED_)

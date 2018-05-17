@@ -30,9 +30,12 @@ public:
 // Dialog Data
 	//{{AFX_DATA(CARPAppDlg)
 	enum { IDD = IDD_arp_DIALOG };
-	CListBox			m_ListChat;
+	CListBox			m_ListARP;
+	CComboBox			m_ComboNIC;
+	CIPAddressCtrl		m_unSrcIPAddr;
 
 	CString				m_unDstEthAddr;
+	
 	CIPAddressCtrl		m_unDstIPAddr;
 
 	//}}AFX_DATA
@@ -63,12 +66,12 @@ protected:
 	afx_msg void OnBnClickedButtonSendgratuitousarp();
 	afx_msg void OnBnClickedButtonCancle();
 	afx_msg void OnBnClickedButtonExit();
+	afx_msg void OnBnClickedButtonSet();
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()
 
 public:
 	BOOL			Receive( unsigned char* ppayload );
-	inline void		SendData( );
 
 private:
 	CLayerManager	m_LayerMgr;
@@ -78,14 +81,20 @@ private:
 					arp_SENDGARP,
 					arp_ERROR,
 					arp_ADDR_SET,
-					arp_ADDR_RESET } ;
+					arp_ADDR_RESET,
+					CFT_COMBO_SET} ;
+
+	inline void		SendGARP();
+	inline void		SendARP();
 
 	void			SetDlgState( int state );
+	void			SetAddresses();
 
 	inline void		EndofProcess( );
 	inline void		SetRegstryMessage( );
 
 	LRESULT			OnUpdateDataFalse(WPARAM wParam, LPARAM lParam);
+	LRESULT			OnARPTableUpdate(WPARAM wParam, LPARAM lParam);
 
 	BOOL			m_bSendReady;
 
@@ -99,6 +108,8 @@ private:
 	UINT			m_wParam;
 	DWORD			m_lParam;
 
+public:
+	afx_msg void OnIpnFieldchangedIpaddress1(NMHDR *pNMHDR, LRESULT *pResult);
 };
 
 //{{AFX_INSERT_LOCATION}}

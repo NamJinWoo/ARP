@@ -64,7 +64,7 @@ END
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDR_MAINFRAME           ICON                    "res\\apple.ico"
+IDR_MAINFRAME           ICON                    "res\\arp.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -97,11 +97,14 @@ BEGIN
     PUSHBUTTON      "Item Delete",IDC_BUTTON_ITEMDELETE,19,143,58,20
     PUSHBUTTON      "All Delete",IDC_BUTTON_ALLDELETE,129,143,54,19
     CONTROL         "",IDC_EDIT_DSTIP,"SysIPAddress32",WS_TABSTOP,36,167,115,15
-    LISTBOX         IDC_LIST_CHAT,11,17,198,121,LBS_NOINTEGRALHEIGHT | LBS_MULTICOLUMN | WS_VSCROLL | WS_TABSTOP,WS_EX_DLGMODALFRAME
+    LISTBOX         IDC_LIST_ARP,11,17,198,121,LBS_NOINTEGRALHEIGHT | LBS_MULTICOLUMN | WS_VSCROLL | WS_TABSTOP,WS_EX_DLGMODALFRAME
     LTEXT           "IP林家",IDC_STATIC,6,170,26,8
     LTEXT           "H/W 林家",IDC_STATIC,231,126,70,8,SS_CENTERIMAGE
     PUSHBUTTON      "Send",IDC_BUTTON_SENDGRATUITOUSARP,254,165,49,18
     PUSHBUTTON      "秒家",IDC_BUTTON_CANCLE,221,199,52,21
+    COMBOBOX        IDC_COMBO_NIC,222,38,150,200, CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "汲沥",IDC_BUTTON_SET,251,81,80,23
+    CONTROL         "",IDC_SRCIP,"SysIPAddress32",WS_TABSTOP,225,61,129,14
 END
 
 

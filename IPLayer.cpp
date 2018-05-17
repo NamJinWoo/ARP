@@ -46,17 +46,6 @@ void CIPLayer::ResetHeader()
 	memset( m_sHeader.ip_data, 0, IP_DATA_SIZE);  // variable length data
 }
 
-char* CIPLayer::GetSrcAddressOfRecv()
-{
-	return this->m_SrcOfRecv;
-}
-
-char* CIPLayer::GetDstAddressOfRecv()
-{
-	return this->m_DstOfRecv;
-	
-}
-
 void CIPLayer::SetSourceAddress(unsigned char *pAddress)
 {
 	// 바이트 오더 처리된 체로 넘어옴
@@ -75,7 +64,7 @@ BOOL CIPLayer::Send(unsigned char *ppayload, int nlength)
 	memcpy( m_sHeader.ip_data, ppayload, nlength ) ;
 	BOOL bSuccess = FALSE ;
 	m_sHeader.ip_len = nlength;
-	bSuccess = this->mp_UnderLayer->Send((unsigned char*)(&m_sHeader), nlength + IP_HEADER_SIZE);
+	bSuccess = this->mp_UnderLayer->Send((unsigned char*)(&m_sHeader), IP_HEADER_SIZE);
 
 	return bSuccess ;
 }
@@ -91,11 +80,6 @@ BOOL CIPLayer::Receive( unsigned char* ppayload )
 	if( memcmp( m_sHeader.ip_src, lpFrame->ip_dst, 4 ) == 0 &&		  // 상대방의 도착지가 내가 맞는지
 		memcmp( m_sHeader.ip_src, lpFrame->ip_src, 4 ) != 0	)		  // 내가 보낸 건 아닌지 //
 	{
-		// 패킷의 주소 저장, 단 넘어온 패킷이 네트워크 바이트 순서라는 거 잊지말기, 즉 빅인디안이니 저장할때 리틀인디안으로 //
-		// arpAppLayer 에서 패킷 내용 출력시 사용하기 위함 //
-		::wsprintfA( m_SrcOfRecv, "%d.%d.%d.%d",lpFrame->ip_src[3],lpFrame->ip_src[2],lpFrame->ip_src[1],lpFrame->ip_src[0]);
-		::wsprintfA( m_DstOfRecv, "%d.%d.%d.%d",lpFrame->ip_dst[3],lpFrame->ip_dst[2],lpFrame->ip_dst[1],lpFrame->ip_dst[0]);
-
 		bSuccess = this->mp_aUpperLayer[0]->Receive(lpFrame->ip_data);
 	}
 	else bSuccess = FALSE;

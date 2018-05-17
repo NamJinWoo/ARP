@@ -17,16 +17,12 @@ class CIPLayer
 private:
 	inline void		ResetHeader( );
 	// 수신한 패킷의 Src와 Dst 주소
-	char	m_SrcOfRecv[30];
-	char	m_DstOfRecv[30];
 public:
 	BOOL			Receive( unsigned char* ppayload ) ;
 	BOOL			Send( unsigned char* ppayload, int nlength );
 
 	void			SetDestinAddress( unsigned char* pAddress );
 	void			SetSourceAddress( unsigned char* pAddress );
-	char*	GetSrcAddressOfRecv( );
-	char*	GetDstAddressOfRecv( ) ;
 
 	CIPLayer( char* pName );
 	virtual ~CIPLayer();
