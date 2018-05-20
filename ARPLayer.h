@@ -21,15 +21,17 @@ private:
 public:
 	BOOL			Receive( unsigned char* ppayload );
 	BOOL			Send( unsigned char* ppayload, int nlength );
+
 	void			setSrcIPAddress(unsigned char* pAddress);
 	void			setSrcMacAddress(unsigned char* pAddress);
 	void			setDstIPAddress(unsigned char* pAddress);
 	void			setDstMacAddress(unsigned char* pAddress);
 
+	unsigned char * getMyMacAddress();
 	void			setMyIPAddress(unsigned char* pAddress);
 	void			setMyMacAddress(unsigned char* pAddress);
 
-	CString			checkTableState( int index );
+	CString			checkTableState( int index, int state );
 	int				getTableCount();
 	void			itemDelete( int index );
 	void			allDelete();
@@ -38,15 +40,15 @@ public:
 	virtual ~CARPLayer();
 
 	typedef struct _ARPLayer_HEADER {
-		unsigned char targetIP[4]; //수신측 IP
-		unsigned char targetMac[6]; //수신측 Mac
-		unsigned char senderIP[4]; //송신측 IP
-		unsigned char senderMac[6]; //송신측 Mac
-		unsigned short op; 
-		unsigned char protSize; //Protocol 크기 2바이트
-		unsigned char hardSize; //하드웨어 크기 2바이트
-		unsigned short protType; //Protocol 타입
 		unsigned short hardType; //Protocol 타입
+		unsigned short protType; //Protocol 타입
+		unsigned char hardSize; //하드웨어 크기 2바이트
+		unsigned char protSize; //Protocol 크기 2바이트
+		unsigned short op; 
+		unsigned char senderMac[6]; //송신측 Mac
+		unsigned char senderIP[4]; //송신측 IP
+		unsigned char targetMac[6]; //수신측 Mac
+		unsigned char targetIP[4]; //수신측 IP
 	} ARPLayer_HEADER, *LPARPLayer_HEADER ;
 
 

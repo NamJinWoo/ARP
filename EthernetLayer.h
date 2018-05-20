@@ -24,6 +24,7 @@ public:
 	void			SetSourceAddress( unsigned char* pAddress );
 	unsigned char*	GetDestinAddress( );
 	unsigned char*	GetSourceAddress( ) ;
+	void			SetEnetType( unsigned short enet_type );
 
 	CEthernetLayer( char* pName );
 	virtual ~CEthernetLayer();

@@ -44,6 +44,11 @@ void CARPLayer::setMyMacAddress(unsigned char* pAddress)
 {
 	memcpy(m_srcMAC, pAddress, 6);
 }
+
+unsigned char * CARPLayer::getMyMacAddress()
+{
+	return m_srcMAC;
+}
 ///////이제 ARP Packet을 설정해봅시다 ㅎㅎ /////////////
 
 //송신자의 IP,MAC 주소를 설정한다.
@@ -81,28 +86,29 @@ BOOL CARPLayer::Send(unsigned char *ppayload, int nlength)
 		m_sHeader.op = htons(0x0001); //request 니깐 1로 설정.
 		
 		
-		unsigned char broadcast[6] = {0xff,};
+		unsigned char broadcast[6] = {0xff,0xff,0xff,0xff,0xff,0xff};
 		
-		setDstMacAddress( m_srcIP );
-
+		// GARP 사용시 돌아올 맥주소를 위해 실제 NIC 맥주소를 같이 보낸다.
+		setDstMacAddress( m_srcMAC );
+	
 		if( memcmp( m_sHeader.targetIP, m_srcIP, 4 ) != 0 ){
 			// arp 인경우만
-			LPCacheTable data = new CacheTable();
-			memcpy( data->ipAddress, m_sHeader.targetIP, 4 );
-			memcpy( data->macAddress, broadcast, 6 );
-			data->state = "imcomplete";
-			data->time = TIMEOFIMCOMPLETE;
+			CacheTable data;
+			memcpy( data.ipAddress, m_sHeader.targetIP, 4 );
+			memcpy( data.macAddress, broadcast, 6 );
+			data.state.Format("%s","imcomplete");
+			data.time = TIMEOFIMCOMPLETE;
 		
 			// arp table에 추가
-			cache_table.AddTail( *data );
+			cache_table.AddTail( data );
 
 			 //없으면 FF-FF-FF...으로 다보냄...
 			//이더넷 주소를 브로드캐스트로 보냄.
-
 			AfxGetApp()->m_pMainWnd->PostMessageA(UM_ARPTABLEUPDATE);
 		}
-
-		((CEthernetLayer * )mp_UnderLayer)->SetSourceAddress(broadcast);
+		
+		((CEthernetLayer * )mp_UnderLayer)->SetEnetType( 0x806 );
+		((CEthernetLayer * )mp_UnderLayer)->SetDestinAddress(broadcast);
 
         return mp_UnderLayer->Send((unsigned char*)&m_sHeader , sizeof(m_sHeader));//여기서 저장된 정보를 하위 레이어로 보냄
 		 //ARP Request 전송
@@ -129,7 +135,8 @@ BOOL CARPLayer::Receive( unsigned char* ppayload )
 		setDstMacAddress( pFrame->senderMac );
 		
 		// 송신한 사람한테만 전송하기위해
-		((CEthernetLayer * )mp_UnderLayer)->SetSourceAddress( pFrame->senderMac );
+		((CEthernetLayer * )mp_UnderLayer)->SetEnetType( 0x806 );
+		((CEthernetLayer * )mp_UnderLayer)->SetDestinAddress( pFrame->targetMac );
 
 		if( memcmp( pFrame->targetIP, pFrame->senderIP, 4 ) == 0 ){
 			// garp 요청인 경우
@@ -141,16 +148,16 @@ BOOL CARPLayer::Receive( unsigned char* ppayload )
 				int ARPindex = SearchCacheTable( pFrame->senderIP );
 
 				if( ARPindex == -1 ){
-					LPCacheTable data = new CacheTable();
-					memcpy( data->ipAddress, pFrame->senderIP, 4 );
-					memcpy( data->macAddress, pFrame->senderMac, 6 );
-					data->state = "complete";
-					data->time = TIMEOFIMCOMPLETE;
-					cache_table.AddTail( *data );
+					CacheTable data;
+					memcpy( data.ipAddress, pFrame->senderIP, 4 );
+					memcpy( data.macAddress, pFrame->senderMac, 6 );
+					data.state.Format("%s","complete");
+					data.time = TIMEOFCOMPLETE;
+					cache_table.AddTail( data );
 				}else{
 					memcpy( cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).ipAddress, pFrame->senderIP, 4);
-					memcpy( cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).macAddress, pFrame->senderMac, 4);
-					cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).state = "complete";
+					memcpy( cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).macAddress, pFrame->senderMac, 6);
+					cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).state.Format("%s","complete");
 					cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).time = TIMEOFCOMPLETE;
 				}
 
@@ -162,13 +169,16 @@ BOOL CARPLayer::Receive( unsigned char* ppayload )
 			int ARPindex = SearchCacheTable( pFrame->senderIP );
 
 			if( ARPindex == -1 ){
-				LPCacheTable data = new CacheTable();
-				memcpy( data->ipAddress, pFrame->senderIP, 4 );
-				memcpy( data->macAddress, pFrame->senderMac, 6 );
-				data->state = "complete";
-				data->time = TIMEOFIMCOMPLETE;
-				cache_table.AddTail( *data );
+				CacheTable data;
+				memcpy( data.ipAddress, pFrame->senderIP, 4 );
+				memcpy( data.macAddress, pFrame->senderMac, 6 );
+				data.state.Format("%s","complete");
+				data.time = TIMEOFCOMPLETE;
+				cache_table.AddTail( data );
 			}else{
+				memcpy( cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).ipAddress, pFrame->senderIP, 4);
+				memcpy( cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).macAddress, pFrame->senderMac, 6);
+				cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).state.Format("%s","complete");
 				cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).time = TIMEOFCOMPLETE;
 			}
 			
@@ -187,13 +197,16 @@ BOOL CARPLayer::Receive( unsigned char* ppayload )
 			int ARPindex = SearchCacheTable( pFrame->senderIP );
 
 			if( ARPindex == -1 ){
-				LPCacheTable data = new CacheTable();
-				memcpy( data->ipAddress, pFrame->senderIP, 4 );
-				memcpy( data->macAddress, pFrame->senderMac, 6 );
-				data->state = "complete";
-				data->time = TIMEOFIMCOMPLETE;
-				cache_table.AddTail( *data );
+				CacheTable data;
+				memcpy( data.ipAddress, pFrame->senderIP, 4 );
+				memcpy( data.macAddress, pFrame->senderMac, 6 );
+				data.state.Format("%s","complete");
+				data.time = TIMEOFCOMPLETE;
+				cache_table.AddTail( data );
 			}else{
+				memcpy( cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).ipAddress, pFrame->senderIP, 4);
+				memcpy( cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).macAddress, pFrame->senderMac, 6);
+				cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).state.Format("%s","complete");
 				cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).time = TIMEOFCOMPLETE;
 			}
 
@@ -205,14 +218,16 @@ BOOL CARPLayer::Receive( unsigned char* ppayload )
 			int ARPindex = SearchCacheTable( pFrame->senderIP );
 
 			if( ARPindex == -1 ){
-				LPCacheTable data = new CacheTable();
-				memcpy( data->ipAddress, pFrame->senderIP, 4 );
-				memcpy( data->macAddress, pFrame->senderMac, 6 );
-				data->state = "complete";
-				data->time = TIMEOFIMCOMPLETE;
-				cache_table.AddTail( *data );
+				CacheTable data;
+				memcpy( data.ipAddress, pFrame->senderIP, 4 );
+				memcpy( data.macAddress, pFrame->senderMac, 6 );
+				data.state.Format("%s","complete");
+				data.time = TIMEOFCOMPLETE;
+				cache_table.AddTail( data );
 			}else{
-				cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).state = "complete";
+				memcpy( cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).ipAddress, pFrame->senderIP, 4);
+				memcpy( cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).macAddress, pFrame->senderMac, 6);
+				cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).state.Format("%s","complete");
 				cache_table.GetAt( cache_table.FindIndex( ARPindex ) ).time = TIMEOFCOMPLETE;
 			}
 			
@@ -241,23 +256,26 @@ int		CARPLayer::getTableCount(){
 	return cache_table.GetCount();
 }
 
-CString CARPLayer::checkTableState( int index ){
+CString CARPLayer::checkTableState( int index, int state ){
 
 	CString index_info;
-	int time = cache_table.GetAt(cache_table.FindIndex(index)).time--;
 	CacheTable& check = cache_table.GetAt(cache_table.FindIndex(index));
+	int time = check.time;
+
+	if( state == 0 ) // 타이머인경우
+		check.time -= 1;
 
 	if( time == TIMEOFDELETE ){
 		// 해당 정보 삭제
-		delete &check;
+		CString deleted("deleted");
 		cache_table.RemoveAt(cache_table.FindIndex(index));
-		return "delete";
+		return deleted;
 	}else if ( time == TIMEOFIMCOMPLETE ){
 		// 아직 못 받음 
-		check.state = "imcomplete";
+		check.state.Format("%s","imcomplete");
 	}
 
-	index_info.Format("%02x.%02x.%02x.%02x  %02x:%02x:%02x:%02x:%02x:%02x  %s",
+	index_info.Format("%d.%d.%d.%d  %02x:%02x:%02x:%02x:%02x:%02x  %s",
 			check.ipAddress[0],
 			check.ipAddress[1],
 			check.ipAddress[2],
@@ -274,15 +292,11 @@ CString CARPLayer::checkTableState( int index ){
 }
 
 void	CARPLayer::itemDelete( int index ){
-	CacheTable& deleted = cache_table.GetAt(cache_table.FindIndex(index));
-
-	delete &deleted;
-
 	cache_table.RemoveAt( cache_table.FindIndex(index) );
 }
 
 void	CARPLayer::allDelete(){
-	while( !cache_table.IsEmpty() ){
-		delete &(cache_table.RemoveTail());
+	if( !cache_table.IsEmpty() ){
+		cache_table.RemoveAll();
 	}
 }

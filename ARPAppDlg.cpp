@@ -83,7 +83,7 @@ CARPAppDlg::CARPAppDlg(CWnd* pParent /*=NULL*/)
 	m_LayerMgr.AddLayer( this ) ; //  ChatDlg
 
 	// -------------------------- 계층 연결 -------------------------- //
-	m_LayerMgr.ConnectLayers("NI ( *Ethernet ( +IP ( -ARP *ARPDlg ) *ARP ) ) )"); // 계층 순서대로 연결
+	m_LayerMgr.ConnectLayers("NI ( *Ethernet ( +IP ( -ARP *ARPDlg ) *ARP ) )"); // 계층 순서대로 연결
 
 	m_ARP = (CARPLayer*) m_LayerMgr.GetLayer( "ARP" ) ;
 	m_IP = (CIPLayer*) m_LayerMgr.GetLayer( "IP" ) ;
@@ -229,7 +229,7 @@ void CARPAppDlg::SetDlgState(int state)
 		m_unSrcIPAddr.EnableWindow( TRUE );
 		pSetButton->SetWindowText( "설정" ) ; 
 		break;
-	case CFT_COMBO_SET: // 왜 안되지 ?
+	case CFT_COMBO_SET:
 		CString NIC_description;
 
 		for(int i = 0 ; i< NI_COUNT_NIC ; i ++ )
@@ -238,7 +238,6 @@ void CARPAppDlg::SetDlgState(int state)
 				break;
 			NIC_description = m_NI->GetAdapter( i )->description ;
 			NIC_description.Trim();
-			
 			m_ComboNIC.AddString( NIC_description ) ;
 			
 		}
@@ -310,27 +309,35 @@ void CARPAppDlg::SetAddresses() // 입력된 주소로 IP 헤더 설정
 {
 	// 맥주소, IP 주소 설정
 	BYTE src_ip[4];
+	unsigned char srcMac[12];
 
 	// 입력된 값으로 주소 설정
 	int index = m_ComboNIC.GetCurSel() ;
-	
+
 	PPACKET_OID_DATA OidData = (PPACKET_OID_DATA)malloc(sizeof(PACKET_OID_DATA));
 	OidData->Oid = 0x01010101;
 	OidData->Length = 6;
 
 	LPADAPTER adapter = PacketOpenAdapter( m_NI->GetAdapter( index )->name ) ;
 	PacketRequest( adapter, FALSE, OidData ) ;
+	
+	srcMac[0] = OidData->Data[0];
+	srcMac[1] = OidData->Data[1];
+	srcMac[2] = OidData->Data[2];
+	srcMac[3] = OidData->Data[3];
+	srcMac[4] = OidData->Data[4];
+	srcMac[5] = OidData->Data[5];
 
-	m_ETH->SetSourceAddress(OidData->Data);
-
+	m_ETH->SetSourceAddress(srcMac);
+	
 	m_unSrcIPAddr.GetAddress(src_ip[0],src_ip[1],src_ip[2],src_ip[3]); // 출발 어드레스 (ip)
 	
 	// arp 헤더 주소 설정
 	m_ARP->setSrcIPAddress( src_ip );
-	m_ARP->setSrcMacAddress( OidData->Data );
+	m_ARP->setSrcMacAddress( srcMac );
 
 	m_ARP->setMyIPAddress( src_ip );
-	m_ARP->setMyMacAddress( OidData->Data );
+	m_ARP->setMyMacAddress( srcMac );
 
 	
 	m_IP->SetSourceAddress(src_ip);
@@ -347,7 +354,7 @@ void CARPAppDlg::SendARP()
 	m_IP->SetDestinAddress( dst_ip );
 	// arp, 주소 설정
 	m_ARP->setDstIPAddress( dst_ip );
-
+	m_ARP->setSrcMacAddress( m_ARP->getMyMacAddress() );
 	BOOL bSuc = m_IP->Send(&temp,1);
 
 	// 전송!
@@ -358,12 +365,12 @@ void CARPAppDlg::SendARP()
 void CARPAppDlg::SendGARP()
 {
 	unsigned char dst_ip[4]; // arp 대상
-	unsigned char dst_mac[6]; // arp 대상
+	unsigned char dst_mac[12]; // arp 대상
 	unsigned char temp = 'a';
 
 	// GARP - targetIP = 본인, targetMAC = ~~, sendIP = 본인, sendMAC = 입력 값
-	m_unDstIPAddr.GetAddress(dst_ip[0],dst_ip[1],dst_ip[2],dst_ip[3]); // 도착 어드레스 (ip)
-	sscanf(m_unDstEthAddr, "%02x%02x%02x%02x%02x%02x", &dst_mac[0], &dst_mac[1], &dst_mac[2], &dst_mac[3], &dst_mac[4], &dst_mac[5]);
+	m_unSrcIPAddr.GetAddress(dst_ip[0],dst_ip[1],dst_ip[2],dst_ip[3]); // 도착 어드레스 (ip)
+	sscanf(m_unDstEthAddr, "%02x:%02x:%02x:%02x:%02x:%02x", &dst_mac[0], &dst_mac[1], &dst_mac[2], &dst_mac[3], &dst_mac[4], &dst_mac[5]);
 	
 	// arp, 주소 설정
 
@@ -405,14 +412,16 @@ LRESULT CARPAppDlg::OnARPTableUpdate(WPARAM wParam, LPARAM lParam)
 
 		m_ListARP.ResetContent();
 
-		while ( i < table_count ){
-			CString i_info = m_ARP->checkTableState(i);
+		while ( table_count != 0 && i < table_count ){
 
+			CString i_info = m_ARP->checkTableState(i, 1);
+			if( i_info.CompareNoCase("deleted") == 0 ){
+				i--;
+			}
 			m_ListARP.AddString( i_info );
+			i++;
+			table_count = m_ARP->getTableCount();
 		}
-
-	AfxGetApp()->m_pMainWnd->PostMessageA(UM_UPDATEDATA);
-    
 	return 0;
 }
 
@@ -457,10 +466,15 @@ void CARPAppDlg::OnTimer(UINT nIDEvent)
 
 		m_ListARP.ResetContent();
 
-		while ( i < table_count ){
-			CString i_info = m_ARP->checkTableState(i);
+		while ( table_count != 0 && i < table_count ){
 
+			CString i_info = m_ARP->checkTableState(i, 0);
+			if( i_info.CompareNoCase("deleted") == 0 ){
+				i--;
+			}
 			m_ListARP.AddString( i_info );
+			i++;
+			table_count = m_ARP->getTableCount();
 		}
 	}
 }
@@ -551,4 +565,5 @@ void CARPAppDlg::OnBnClickedButtonCancle()
 void CARPAppDlg::OnBnClickedButtonExit()
 {
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	EndofProcess();
 }
